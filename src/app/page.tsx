@@ -61,6 +61,7 @@ const STORAGE_KEYS = {
 const guardarReportesDiarios = (reportes: ReporteDiario[]) => {
   try {
     localStorage.setItem(STORAGE_KEYS.REPORTES_DIARIOS, JSON.stringify(reportes));
+    console.log('Reportes diarios guardados:', reportes.length);
   } catch (error) {
     console.error('Error guardando reportes diarios:', error);
   }
@@ -69,7 +70,9 @@ const guardarReportesDiarios = (reportes: ReporteDiario[]) => {
 const cargarReportesDiarios = (): ReporteDiario[] => {
   try {
     const data = localStorage.getItem(STORAGE_KEYS.REPORTES_DIARIOS);
-    return data ? JSON.parse(data) : [];
+    const parsed = data ? JSON.parse(data) : [];
+    console.log('Reportes diarios cargados:', parsed.length);
+    return parsed;
   } catch (error) {
     console.error('Error cargando reportes diarios:', error);
     return [];
@@ -186,6 +189,55 @@ export default function Home() {
     setPersonal(cargarPersonal());
     setReportesSemanales(cargarReportesSemanales());
   }, []);
+
+  // Guardar automáticamente antes de que se recargue la página
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      // Guardar el estado actual antes de recargar
+      guardarReportesDiarios(reportesDiarios);
+      guardarPersonal(personal);
+      guardarReportesSemanales(reportesSemanales);
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [reportesDiarios, personal, reportesSemanales]);
+
+  // Guardado automático periódico (cada 30 segundos)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      guardarReportesDiarios(reportesDiarios);
+      guardarPersonal(personal);
+      guardarReportesSemanales(reportesSemanales);
+    }, 30000); // 30 segundos
+
+    return () => clearInterval(interval);
+  }, [reportesDiarios, personal, reportesSemanales]);
+
+  // Guardar cuando se cambia de pestaña
+  useEffect(() => {
+    guardarReportesDiarios(reportesDiarios);
+    guardarPersonal(personal);
+    guardarReportesSemanales(reportesSemanales);
+  }, [activeTab]); // Se ejecuta cada vez que cambia la pestaña
+
+  // Guardar cuando se pierde el foco de la ventana
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        guardarReportesDiarios(reportesDiarios);
+        guardarPersonal(personal);
+        guardarReportesSemanales(reportesSemanales);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [reportesDiarios, personal, reportesSemanales]);
 
   // Estados para filtros
   const [filtroTurno, setFiltroTurno] = useState('todos');
