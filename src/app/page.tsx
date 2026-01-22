@@ -159,7 +159,7 @@ export default function Home() {
   // Función para calcular cierres diarios disponibles
   const calcularCierresDisponibles = () => {
     const cierres: CierreDiario[] = [];
-    const fechasUnicas = [...new Set(reportesDiarios.map(r => r.fecha))];
+    const fechasUnicas = Array.from(new Set(reportesDiarios.map(r => r.fecha)));
 
     fechasUnicas.forEach(fecha => {
       const reportesDia = reportesDiarios.filter(r => r.fecha === fecha);
