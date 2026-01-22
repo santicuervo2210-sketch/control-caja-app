@@ -1,13 +1,61 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { Calculator, FileText, Users, Plus, DollarSign, CreditCard, Banknote, User, Clock, X, Calendar } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { Calculator, FileText, Users, Plus, Banknote, User, Clock, X, Calendar } from 'lucide-react';
+
+// Interfaces para tipos TypeScript
+interface Venta {
+  id: number;
+  monto: number;
+  metodo: string;
+  hora: string;
+  nombreTransferencia: string | null;
+  timestamp: number;
+}
+
+interface ReporteDiario {
+  id: string;
+  fecha: string;
+  turno: string;
+  horaInicio: string;
+  horaCambio: string;
+  empleada: string;
+  cajaInicial: number;
+  ventas: Venta[];
+  ingresoEfectivo: number;
+  ingresoTransferencia: number;
+  total: number;
+  timestamp: number;
+}
+
+interface Personal {
+  id: number;
+  nombre: string;
+  activo: boolean;
+}
+
+interface ReporteSemanal {
+  semana: string;
+  totalSemana: number;
+  totalManana: number;
+  totalTarde: number;
+  diasTrabajados: number;
+  reportes: ReporteDiario[];
+  timestamp: number;
+}
+
+interface CierreDiario {
+  fecha: string;
+  turnoManana: ReporteDiario | null;
+  turnoTarde: ReporteDiario;
+  totalDia: number;
+}
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState('reportes');
 
   // Estados para ventas
-  const [ventas, setVentas] = useState([]);
+  const [ventas, setVentas] = useState<Venta[]>([]);
   const [montoVenta, setMontoVenta] = useState('');
   const [metodoPago, setMetodoPago] = useState('efectivo');
   const [nombreTransferencia, setNombreTransferencia] = useState('');
@@ -20,24 +68,24 @@ export default function Home() {
   const [horaCambio, setHoraCambio] = useState('');
 
   // Estados para reportes y cierres
-  const [reportesDiarios, setReportesDiarios] = useState([]);
+  const [reportesDiarios, setReportesDiarios] = useState<ReporteDiario[]>([]);
   const [mostrarCierreDiario, setMostrarCierreDiario] = useState(false);
-  const [cierreDiario, setCierreDiario] = useState(null);
+  const [cierreDiario, setCierreDiario] = useState<CierreDiario | null>(null);
 
   // Estados para personal
-  const [personal, setPersonal] = useState([]);
+  const [personal, setPersonal] = useState<Personal[]>([]);
   const [nuevoNombrePersonal, setNuevoNombrePersonal] = useState('');
 
   // Estados para reportes semanales
-  const [reportesSemanales, setReportesSemanales] = useState([]);
+  const [reportesSemanales, setReportesSemanales] = useState<ReporteSemanal[]>([]);
 
   // Estados para filtros
   const [filtroTurno, setFiltroTurno] = useState('todos');
   const [mensaje, setMensaje] = useState('');
 
   // Refs para inputs
-  const nombreInputRef = useRef(null);
-  const montoInputRef = useRef(null);
+  const nombreInputRef = useRef<HTMLInputElement>(null);
+  const montoInputRef = useRef<HTMLInputElement>(null);
 
   // Función para agregar venta
   const agregarVenta = () => {
@@ -89,14 +137,14 @@ export default function Home() {
   };
 
   // Función para eliminar venta
-  const eliminarVenta = (id) => {
+  const eliminarVenta = (id: number) => {
     setVentas(ventas.filter(venta => venta.id !== id));
     setMensaje('🗑️ Venta eliminada');
     setTimeout(() => setMensaje(''), 2000);
   };
 
   // Función para establecer horas del turno
-  const establecerHorasTurno = (turno) => {
+  const establecerHorasTurno = (turno: string) => {
     const hoy = new Date();
     const fechaFormateada = hoy.toLocaleDateString('es-ES');
 
@@ -198,14 +246,14 @@ export default function Home() {
   };
 
   // Función para toggle personal
-  const togglePersonal = (id) => {
+  const togglePersonal = (id: number) => {
     setPersonal(personal.map(p =>
       p.id === id ? { ...p, activo: !p.activo } : p
     ));
   };
 
   // Función para eliminar personal
-  const eliminarPersonal = (id) => {
+  const eliminarPersonal = (id: number) => {
     setPersonal(personal.filter(p => p.id !== id));
     setMensaje('🗑️ Personal eliminado');
     setTimeout(() => setMensaje(''), 2000);
@@ -236,7 +284,7 @@ export default function Home() {
       totalSemana: reportesSemana.reduce((total, r) => total + r.total, 0),
       totalManana: reportesSemana.filter(r => r.turno === '8-15').reduce((total, r) => total + r.total, 0),
       totalTarde: reportesSemana.filter(r => r.turno === '15-22').reduce((total, r) => total + r.total, 0),
-      diasTrabajados: [...new Set(reportesSemana.map(r => r.fecha))].length,
+      diasTrabajados: Array.from(new Set(reportesSemana.map(r => r.fecha))).length,
       reportes: reportesSemana,
       timestamp: ahora.getTime()
     };
@@ -260,7 +308,7 @@ export default function Home() {
   };
 
   // Handlers para teclado
-  const handleNombreKeyPress = (e) => {
+  const handleNombreKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       if (montoInputRef.current) {
@@ -269,14 +317,14 @@ export default function Home() {
     }
   };
 
-  const handleMontoKeyPress = (e) => {
+  const handleMontoKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       agregarVenta();
     }
   };
 
-  const handleTransferenciaKeyPress = (e) => {
+  const handleTransferenciaKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       agregarVenta();
@@ -1102,13 +1150,13 @@ export default function Home() {
                           <h5 className="font-medium text-gray-800 mb-4 text-lg">📅 Detalle por días:</h5>
                           <div className="space-y-3">
                             {Object.entries(
-                              reporte.reportes.reduce((acc, r) => {
+                              reporte.reportes.reduce((acc: {[key: string]: ReporteDiario[]}, r) => {
                                 if (!acc[r.fecha]) acc[r.fecha] = [];
                                 acc[r.fecha].push(r);
                                 return acc;
-                              }, {})
+                              }, {} as {[key: string]: ReporteDiario[]})
                             )
-                              .sort(([a], [b]) => new Date(a.split('/').reverse().join('-')) - new Date(b.split('/').reverse().join('-')))
+                              .sort(([a]: [string, ReporteDiario[]], [b]: [string, ReporteDiario[]]) => new Date(a.split('/').reverse().join('-')).getTime() - new Date(b.split('/').reverse().join('-')).getTime())
                               .map(([fecha, reportesDia]) => {
                                 const totalDia = reportesDia.reduce((t, r) => t + r.total, 0);
                                 return (
