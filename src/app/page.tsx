@@ -61,7 +61,6 @@ const STORAGE_KEYS = {
 const guardarReportesDiarios = (reportes: ReporteDiario[]) => {
   try {
     localStorage.setItem(STORAGE_KEYS.REPORTES_DIARIOS, JSON.stringify(reportes));
-    console.log('Reportes diarios guardados:', reportes.length);
   } catch (error) {
     console.error('Error guardando reportes diarios:', error);
   }
@@ -70,9 +69,7 @@ const guardarReportesDiarios = (reportes: ReporteDiario[]) => {
 const cargarReportesDiarios = (): ReporteDiario[] => {
   try {
     const data = localStorage.getItem(STORAGE_KEYS.REPORTES_DIARIOS);
-    const parsed = data ? JSON.parse(data) : [];
-    console.log('Reportes diarios cargados:', parsed.length);
-    return parsed;
+    return data ? JSON.parse(data) : [];
   } catch (error) {
     console.error('Error cargando reportes diarios:', error);
     return [];
