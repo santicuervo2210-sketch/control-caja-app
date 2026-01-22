@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Calculator, FileText, Users, Plus, Banknote, User, Clock, X, Calendar } from 'lucide-react';
 
 // Interfaces para tipos TypeScript
@@ -51,6 +51,67 @@ interface CierreDiario {
   totalDia: number;
 }
 
+// Funciones para localStorage
+const STORAGE_KEYS = {
+  REPORTES_DIARIOS: 'control-caja-reportes-diarios',
+  PERSONAL: 'control-caja-personal',
+  REPORTES_SEMANALES: 'control-caja-reportes-semanales'
+};
+
+const guardarReportesDiarios = (reportes: ReporteDiario[]) => {
+  try {
+    localStorage.setItem(STORAGE_KEYS.REPORTES_DIARIOS, JSON.stringify(reportes));
+  } catch (error) {
+    console.error('Error guardando reportes diarios:', error);
+  }
+};
+
+const cargarReportesDiarios = (): ReporteDiario[] => {
+  try {
+    const data = localStorage.getItem(STORAGE_KEYS.REPORTES_DIARIOS);
+    return data ? JSON.parse(data) : [];
+  } catch (error) {
+    console.error('Error cargando reportes diarios:', error);
+    return [];
+  }
+};
+
+const guardarPersonal = (personal: Personal[]) => {
+  try {
+    localStorage.setItem(STORAGE_KEYS.PERSONAL, JSON.stringify(personal));
+  } catch (error) {
+    console.error('Error guardando personal:', error);
+  }
+};
+
+const cargarPersonal = (): Personal[] => {
+  try {
+    const data = localStorage.getItem(STORAGE_KEYS.PERSONAL);
+    return data ? JSON.parse(data) : [];
+  } catch (error) {
+    console.error('Error cargando personal:', error);
+    return [];
+  }
+};
+
+const guardarReportesSemanales = (reportes: ReporteSemanal[]) => {
+  try {
+    localStorage.setItem(STORAGE_KEYS.REPORTES_SEMANALES, JSON.stringify(reportes));
+  } catch (error) {
+    console.error('Error guardando reportes semanales:', error);
+  }
+};
+
+const cargarReportesSemanales = (): ReporteSemanal[] => {
+  try {
+    const data = localStorage.getItem(STORAGE_KEYS.REPORTES_SEMANALES);
+    return data ? JSON.parse(data) : [];
+  } catch (error) {
+    console.error('Error cargando reportes semanales:', error);
+    return [];
+  }
+};
+
 export default function Home() {
   const [activeTab, setActiveTab] = useState('reportes');
 
@@ -78,6 +139,53 @@ export default function Home() {
 
   // Estados para reportes semanales
   const [reportesSemanales, setReportesSemanales] = useState<ReporteSemanal[]>([]);
+
+  // Funciones helper para actualizar estado con localStorage
+  const actualizarReportesDiarios = (nuevosReportes: ReporteDiario[]) => {
+    setReportesDiarios(nuevosReportes);
+    guardarReportesDiarios(nuevosReportes);
+  };
+
+  const actualizarPersonal = (nuevoPersonal: Personal[]) => {
+    setPersonal(nuevoPersonal);
+    guardarPersonal(nuevoPersonal);
+  };
+
+  const actualizarReportesSemanales = (nuevosReportes: ReporteSemanal[]) => {
+    setReportesSemanales(nuevosReportes);
+    guardarReportesSemanales(nuevosReportes);
+  };
+
+  // Función para calcular cierres diarios disponibles
+  const calcularCierresDisponibles = () => {
+    const cierres: CierreDiario[] = [];
+    const fechasUnicas = [...new Set(reportesDiarios.map(r => r.fecha))];
+
+    fechasUnicas.forEach(fecha => {
+      const reportesDia = reportesDiarios.filter(r => r.fecha === fecha);
+      const turnoManana = reportesDia.find(r => r.turno === '8-15');
+      const turnoTarde = reportesDia.find(r => r.turno === '15-22');
+
+      // Solo crear cierre si hay turno tarde (que es cuando se genera el cierre)
+      if (turnoTarde) {
+        cierres.push({
+          fecha,
+          turnoManana: turnoManana || null,
+          turnoTarde,
+          totalDia: (turnoManana ? turnoManana.total : 0) + turnoTarde.total
+        });
+      }
+    });
+
+    return cierres.sort((a, b) => new Date(b.fecha.split('/').reverse().join('-')).getTime() - new Date(a.fecha.split('/').reverse().join('-')).getTime());
+  };
+
+  // Cargar datos del localStorage al iniciar
+  useEffect(() => {
+    setReportesDiarios(cargarReportesDiarios());
+    setPersonal(cargarPersonal());
+    setReportesSemanales(cargarReportesSemanales());
+  }, []);
 
   // Estados para filtros
   const [filtroTurno, setFiltroTurno] = useState('todos');
@@ -196,10 +304,10 @@ export default function Home() {
     if (reporteExistenteIndex >= 0) {
       const nuevosReportes = [...reportesDiarios];
       nuevosReportes[reporteExistenteIndex] = reporte;
-      setReportesDiarios(nuevosReportes);
+      actualizarReportesDiarios(nuevosReportes);
       setMensaje('Reporte actualizado');
     } else {
-      setReportesDiarios([...reportesDiarios, reporte]);
+      actualizarReportesDiarios([...reportesDiarios, reporte]);
       setMensaje(`Reporte guardado`);
     }
 
@@ -239,7 +347,7 @@ export default function Home() {
       activo: true
     };
 
-    setPersonal([...personal, nuevoPersonal]);
+    actualizarPersonal([...personal, nuevoPersonal]);
     setNuevoNombrePersonal('');
     setMensaje('✅ Personal agregado');
     setTimeout(() => setMensaje(''), 2000);
@@ -247,15 +355,15 @@ export default function Home() {
 
   // Función para toggle personal
   const togglePersonal = (id: number) => {
-    setPersonal(personal.map(p =>
+    actualizarPersonal(personal.map(p =>
       p.id === id ? { ...p, activo: !p.activo } : p
     ));
   };
 
   // Función para eliminar personal
   const eliminarPersonal = (id: number) => {
-    setPersonal(personal.filter(p => p.id !== id));
-    setMensaje('🗑️ Personal eliminado');
+    actualizarPersonal(personal.filter(p => p.id !== id));
+    setMensaje('Personal eliminado');
     setTimeout(() => setMensaje(''), 2000);
   };
 
@@ -289,7 +397,7 @@ export default function Home() {
       timestamp: ahora.getTime()
     };
 
-    setReportesSemanales([...reportesSemanales, estadisticas]);
+    actualizarReportesSemanales([...reportesSemanales, estadisticas]);
     setMensaje('📊 Reporte semanal generado');
     setTimeout(() => setMensaje(''), 3000);
   };
@@ -357,13 +465,42 @@ export default function Home() {
           <div className="space-y-4">
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
               <div className="flex items-center gap-2 mb-6">
-                <Calculator size={28} className="text-indigo-600" />
+                <Calculator size={28} className="text-blue-600" />
                 <h2 className="text-2xl font-bold text-gray-800">
                   Cierres Diarios
                 </h2>
               </div>
 
-              {/* Cierre Diario Actual */}
+              {/* Lista de Cierres Disponibles */}
+              {(() => {
+                const cierresDisponibles = calcularCierresDisponibles();
+                return cierresDisponibles.length > 0 ? (
+                  <div className="space-y-4 mb-6">
+                    <p className="text-gray-600 mb-4">Cierres diarios disponibles:</p>
+                    {cierresDisponibles.map((cierre, index) => (
+                      <div key={index} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 cursor-pointer transition-colors"
+                           onClick={() => {
+                             setCierreDiario(cierre);
+                             setMostrarCierreDiario(true);
+                           }}>
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <h3 className="font-semibold text-gray-800">Cierre del {cierre.fecha}</h3>
+                            <p className="text-sm text-gray-600">
+                              Total: ${cierre.totalDia.toLocaleString()}
+                            </p>
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {cierre.turnoManana ? 'Ambos turnos' : 'Solo tarde'}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : null;
+              })()}
+
+              {/* Cierre Diario Detallado */}
               {mostrarCierreDiario && cierreDiario ? (
                 <div className="bg-gradient-to-r from-green-50 to-blue-50 border-2 border-green-200 rounded-xl shadow-lg p-6 mb-6">
                   <div className="flex items-center gap-2 mb-4">
@@ -455,10 +592,13 @@ export default function Home() {
 
                   <div className="flex justify-end mt-4">
                     <button
-                      onClick={() => setMostrarCierreDiario(false)}
-                      className="px-6 py-3 bg-gray-600 text-white rounded-xl hover:bg-gray-700 transition-colors font-medium"
+                      onClick={() => {
+                        setMostrarCierreDiario(false);
+                        setCierreDiario(null);
+                      }}
+                      className="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors font-medium"
                     >
-                      ❌ Cerrar
+                      Cerrar
                     </button>
                   </div>
                 </div>
@@ -466,10 +606,10 @@ export default function Home() {
                 <div className="bg-blue-50 border border-blue-200 rounded-xl p-8 text-center">
                   <div className="text-5xl mb-4">🏪</div>
                   <h3 className="text-xl font-semibold text-blue-800 mb-2">
-                    No hay cierre diario activo
+                    No hay cierres diarios disponibles
                   </h3>
                   <p className="text-blue-600 text-lg">
-                    Los cierres diarios se generan automáticamente al finalizar el turno tarde.
+                    Los cierres diarios se generan automáticamente al guardar reportes del turno tarde en la sección de Reportes.
                   </p>
                 </div>
               )}
