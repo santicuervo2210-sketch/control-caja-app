@@ -125,7 +125,7 @@ export default function Home() {
     if (metodoPago === 'transferencia') {
       setNombreTransferencia('');
     }
-    setMensaje('✅ Venta agregada correctamente');
+    setMensaje('Venta registrada correctamente');
 
     // Focus en el input de monto para la siguiente venta
     setTimeout(() => {
@@ -139,7 +139,7 @@ export default function Home() {
   // Función para eliminar venta
   const eliminarVenta = (id: number) => {
     setVentas(ventas.filter(venta => venta.id !== id));
-    setMensaje('🗑️ Venta eliminada');
+    setMensaje('Venta eliminada');
     setTimeout(() => setMensaje(''), 2000);
   };
 
@@ -197,10 +197,10 @@ export default function Home() {
       const nuevosReportes = [...reportesDiarios];
       nuevosReportes[reporteExistenteIndex] = reporte;
       setReportesDiarios(nuevosReportes);
-      setMensaje(`🔄 Reporte actualizado`);
+      setMensaje('Reporte actualizado');
     } else {
       setReportesDiarios([...reportesDiarios, reporte]);
-      setMensaje(`💾 Reporte guardado`);
+      setMensaje(`Reporte guardado`);
     }
 
     // Si es turno tarde, mostrar cierre diario
@@ -332,14 +332,14 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-cyan-50 pb-24">
+    <div className="min-h-screen bg-gray-50 pb-24">
       {/* Header */}
-      <header className="bg-gradient-to-r from-indigo-600 to-cyan-600 shadow-lg px-4 py-4">
-        <h1 className="text-3xl md:text-4xl font-bold text-center text-white drop-shadow-sm">
-          🏪 Control de Caja - Almacén
+      <header className="bg-white shadow-sm border-b border-gray-200 px-4 py-4">
+        <h1 className="text-3xl md:text-4xl font-bold text-center text-gray-900">
+          Control de Caja - Almacén
         </h1>
-        <p className="text-center text-indigo-100 text-sm mt-1">
-          Sistema rápido y eficiente • {new Date().toLocaleDateString('es-ES')}
+        <p className="text-center text-gray-600 text-sm mt-1">
+          Sistema profesional de gestión • {new Date().toLocaleDateString('es-ES')}
         </p>
       </header>
 
@@ -355,11 +355,11 @@ export default function Home() {
         {/* Módulo de Cierre */}
         {activeTab === 'cierre' && (
           <div className="space-y-4">
-            <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl border border-indigo-100 p-6">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
               <div className="flex items-center gap-2 mb-6">
                 <Calculator size={28} className="text-indigo-600" />
                 <h2 className="text-2xl font-bold text-gray-800">
-                  📊 Cierres Diarios
+                  Cierres Diarios
                 </h2>
               </div>
 
@@ -485,7 +485,7 @@ export default function Home() {
               <div className="flex items-center gap-2 mb-6">
                 <FileText size={28} className="text-emerald-600" />
                 <h2 className="text-2xl font-bold text-gray-800">
-                  📝 Registro de Ventas - Turno {turnoSeleccionado || 'No seleccionado'}
+                  Registro de Ventas - Turno {turnoSeleccionado || 'No seleccionado'}
                 </h2>
               </div>
 
@@ -644,7 +644,7 @@ export default function Home() {
                     <button
                       type="button"
                       onClick={agregarVenta}
-                      className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 text-white py-6 px-8 rounded-2xl hover:from-emerald-600 hover:to-teal-700 focus:outline-none focus:ring-4 focus:ring-emerald-500 focus:ring-offset-2 transition-all duration-200 font-bold text-2xl shadow-xl transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                      className="w-full bg-blue-600 text-white py-6 px-8 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors duration-200 font-semibold text-xl shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                       disabled={!montoVenta || (metodoPago === 'transferencia' && !nombreTransferencia.trim())}
                     >
                       ➕ AGREGAR VENTA
@@ -798,8 +798,8 @@ export default function Home() {
                   </div>
 
                   {/* Total Final */}
-                  <div className="mt-8 bg-gradient-to-r from-emerald-500 to-teal-600 p-8 rounded-2xl text-white text-center shadow-xl">
-                    <div className="text-lg font-medium mb-2">💰 TOTAL EN CAJA</div>
+                  <div className="mt-8 bg-gray-800 p-8 rounded-lg text-white text-center shadow-sm">
+                    <div className="text-lg font-medium mb-2">TOTAL EN CAJA</div>
                     <div className="text-6xl font-bold">
                       ${(parseInt(cajaInicial) + calcularTotalVentas()).toLocaleString()}
                     </div>
@@ -810,7 +810,7 @@ export default function Home() {
                 <button
                   type="button"
                   onClick={guardarReporteDiario}
-                  className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 text-white py-6 px-8 rounded-2xl hover:from-emerald-700 hover:to-teal-700 focus:outline-none focus:ring-4 focus:ring-emerald-500 focus:ring-offset-2 transition-all duration-200 font-bold text-2xl shadow-xl transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                  className="w-full bg-green-600 text-white py-6 px-8 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors duration-200 font-semibold text-xl shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                   disabled={!turnoSeleccionado || !nombreEmpleada.trim()}
                 >
                   💾 GUARDAR REPORTE DEL TURNO
@@ -1191,7 +1191,7 @@ export default function Home() {
             onClick={() => setActiveTab('cierre')}
             className={`flex flex-col items-center p-4 rounded-2xl transition-all duration-200 ${
               activeTab === 'cierre'
-                ? 'text-white bg-gradient-to-r from-indigo-500 to-cyan-500 shadow-xl transform scale-110'
+                ? 'text-white bg-blue-600 shadow-sm'
                 : 'text-gray-600 hover:text-indigo-600 hover:bg-indigo-50'
             }`}
           >
@@ -1203,7 +1203,7 @@ export default function Home() {
             onClick={() => setActiveTab('reportes')}
             className={`flex flex-col items-center p-4 rounded-2xl transition-all duration-200 ${
               activeTab === 'reportes'
-                ? 'text-white bg-gradient-to-r from-emerald-500 to-teal-500 shadow-xl transform scale-110'
+                ? 'text-white bg-green-600 shadow-sm'
                 : 'text-gray-600 hover:text-emerald-600 hover:bg-emerald-50'
             }`}
           >
@@ -1215,7 +1215,7 @@ export default function Home() {
             onClick={() => setActiveTab('personal')}
             className={`flex flex-col items-center p-4 rounded-2xl transition-all duration-200 ${
               activeTab === 'personal'
-                ? 'text-white bg-gradient-to-r from-violet-500 to-purple-500 shadow-xl transform scale-110'
+                ? 'text-white bg-purple-600 shadow-sm'
                 : 'text-gray-600 hover:text-violet-600 hover:bg-violet-50'
             }`}
           >
@@ -1227,7 +1227,7 @@ export default function Home() {
             onClick={() => setActiveTab('semanal')}
             className={`flex flex-col items-center p-4 rounded-2xl transition-all duration-200 ${
               activeTab === 'semanal'
-                ? 'text-white bg-gradient-to-r from-amber-500 to-orange-500 shadow-xl transform scale-110'
+                ? 'text-white bg-orange-600 shadow-sm'
                 : 'text-gray-600 hover:text-amber-600 hover:bg-amber-50'
             }`}
           >

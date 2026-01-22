@@ -3,25 +3,97 @@
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Paleta profesional */
+  --primary: #1e40af;        /* Azul marino */
+  --primary-light: #3b82f6;  /* Azul claro */
+  --secondary: #64748b;     /* Gris azulado */
+  --accent: #10b981;        /* Verde esmeralda */
+  --accent-light: #34d399;  /* Verde claro */
+  --warning: #f59e0b;       /* Ámbar */
+  --danger: #ef4444;        /* Rojo */
+
+  /* Fondos y texto */
+  --background: #f8fafc;    /* Gris muy claro */
+  --foreground: #1e293b;   /* Gris oscuro */
+  --card-bg: #ffffff;      /* Blanco para cards */
+  --border: #e2e8f0;       /* Gris claro para bordes */
+
+  /* Gradientes profesionales */
+  --gradient-primary: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+  --gradient-accent: linear-gradient(135deg, #10b981 0%, #34d399 100%);
+  --gradient-warm: linear-gradient(135deg, #64748b 0%, #94a3b8 100%);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #0f172a;    /* Azul muy oscuro */
+    --foreground: #f1f5f9;   /* Gris muy claro */
+    --card-bg: #1e293b;      /* Gris oscuro para cards */
+    --border: #334155;       /* Gris medio para bordes */
   }
 }
 
 body {
   color: var(--foreground);
   background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@layer components {
+  /* Botones principales */
+  .btn-primary {
+    @apply bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-200 shadow-sm hover:shadow-md;
+  }
+
+  .btn-secondary {
+    @apply bg-gray-500 hover:bg-gray-600 text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-200 shadow-sm hover:shadow-md;
+  }
+
+  .btn-success {
+    @apply bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-200 shadow-sm hover:shadow-md;
+  }
+
+  /* Cards */
+  .card {
+    @apply bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow duration-200;
+  }
+
+  .card-header {
+    @apply border-b border-gray-200 pb-4 mb-4;
+  }
+
+  /* Form inputs */
+  .input-primary {
+    @apply w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200;
+  }
+
+  /* Text utilities */
+  .text-muted {
+    @apply text-gray-600;
+  }
+
+  .text-heading {
+    @apply text-gray-900 font-semibold;
+  }
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+
+  .gradient-primary {
+    background: var(--gradient-primary);
+  }
+
+  .gradient-accent {
+    background: var(--gradient-accent);
+  }
+
+  .gradient-warm {
+    background: var(--gradient-warm);
   }
 }
