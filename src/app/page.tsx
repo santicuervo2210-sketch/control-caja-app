@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Calculator, FileText, Users, Plus, Banknote, User, Clock, X, Calendar } from 'lucide-react';
+import { Calculator, FileText, Users, Plus, Banknote, User, Clock, X, Calendar, Settings } from 'lucide-react';
 
 // Interfaces para tipos TypeScript
 interface Venta {
@@ -51,64 +51,208 @@ interface CierreDiario {
   totalDia: number;
 }
 
-// Funciones para localStorage
+// Funciones para localStorage con backup
 const STORAGE_KEYS = {
   REPORTES_DIARIOS: 'control-caja-reportes-diarios',
   PERSONAL: 'control-caja-personal',
-  REPORTES_SEMANALES: 'control-caja-reportes-semanales'
+  REPORTES_SEMANALES: 'control-caja-reportes-semanales',
+  BACKUP_TIMESTAMP: 'control-caja-backup-timestamp'
+};
+
+// Función para verificar si localStorage está disponible
+const isLocalStorageAvailable = (): boolean => {
+  try {
+    const test = '__localStorage_test__';
+    localStorage.setItem(test, test);
+    localStorage.removeItem(test);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+// Función para guardar con backup
+const guardarConBackup = (key: string, data: any) => {
+  if (!isLocalStorageAvailable()) {
+    console.error('localStorage no disponible');
+    return false;
+  }
+
+  try {
+    const backupKey = `${key}_backup_${Date.now()}`;
+    const timestamp = Date.now();
+
+    // Guardar datos principales
+    localStorage.setItem(key, JSON.stringify(data));
+
+    // Crear backup
+    localStorage.setItem(backupKey, JSON.stringify({
+      data,
+      timestamp,
+      version: '1.0'
+    }));
+
+    // Actualizar timestamp del último backup
+    localStorage.setItem(STORAGE_KEYS.BACKUP_TIMESTAMP, timestamp.toString());
+
+    // Limpiar backups antiguos (mantener solo los últimos 5)
+    const allKeys = Object.keys(localStorage);
+    const backupKeys = allKeys.filter(k => k.startsWith(`${key}_backup_`))
+      .sort((a, b) => {
+        const aTime = parseInt(a.split('_').pop() || '0');
+        const bTime = parseInt(b.split('_').pop() || '0');
+        return bTime - aTime;
+      });
+
+    if (backupKeys.length > 5) {
+      backupKeys.slice(5).forEach(oldKey => {
+        localStorage.removeItem(oldKey);
+      });
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error guardando con backup:', error);
+    return false;
+  }
+};
+
+// Función para cargar con recuperación automática
+const cargarConRecuperacion = (key: string, defaultValue: any = []): any => {
+  if (!isLocalStorageAvailable()) {
+    console.warn('localStorage no disponible, usando valores por defecto');
+    return defaultValue;
+  }
+
+  try {
+    // Intentar cargar datos principales
+    const data = localStorage.getItem(key);
+    if (data) {
+      const parsed = JSON.parse(data);
+      console.log(`Datos cargados correctamente de ${key}:`, parsed.length || 'objeto');
+      return parsed;
+    }
+
+    // Si no hay datos principales, intentar recuperar del backup más reciente
+    const allKeys = Object.keys(localStorage);
+    const backupKeys = allKeys.filter(k => k.startsWith(`${key}_backup_`))
+      .sort((a, b) => {
+        const aTime = parseInt(a.split('_').pop() || '0');
+        const bTime = parseInt(b.split('_').pop() || '0');
+        return bTime - aTime;
+      });
+
+    if (backupKeys.length > 0) {
+      const latestBackup = localStorage.getItem(backupKeys[0]);
+      if (latestBackup) {
+        const backupData = JSON.parse(latestBackup);
+        console.log(`Datos recuperados del backup para ${key}:`, backupData.data.length || 'objeto');
+        // Restaurar datos del backup
+        localStorage.setItem(key, JSON.stringify(backupData.data));
+        return backupData.data;
+      }
+    }
+
+    console.log(`No se encontraron datos para ${key}, usando valores por defecto`);
+    return defaultValue;
+  } catch (error) {
+    console.error(`Error cargando datos de ${key}:`, error);
+    return defaultValue;
+  }
 };
 
 const guardarReportesDiarios = (reportes: ReporteDiario[]) => {
-  try {
-    localStorage.setItem(STORAGE_KEYS.REPORTES_DIARIOS, JSON.stringify(reportes));
-  } catch (error) {
-    console.error('Error guardando reportes diarios:', error);
-  }
+  return guardarConBackup(STORAGE_KEYS.REPORTES_DIARIOS, reportes);
 };
 
 const cargarReportesDiarios = (): ReporteDiario[] => {
-  try {
-    const data = localStorage.getItem(STORAGE_KEYS.REPORTES_DIARIOS);
-    return data ? JSON.parse(data) : [];
-  } catch (error) {
-    console.error('Error cargando reportes diarios:', error);
-    return [];
-  }
+  return cargarConRecuperacion(STORAGE_KEYS.REPORTES_DIARIOS, []);
 };
 
 const guardarPersonal = (personal: Personal[]) => {
-  try {
-    localStorage.setItem(STORAGE_KEYS.PERSONAL, JSON.stringify(personal));
-  } catch (error) {
-    console.error('Error guardando personal:', error);
-  }
+  return guardarConBackup(STORAGE_KEYS.PERSONAL, personal);
 };
 
 const cargarPersonal = (): Personal[] => {
-  try {
-    const data = localStorage.getItem(STORAGE_KEYS.PERSONAL);
-    return data ? JSON.parse(data) : [];
-  } catch (error) {
-    console.error('Error cargando personal:', error);
-    return [];
-  }
+  return cargarConRecuperacion(STORAGE_KEYS.PERSONAL, []);
 };
 
 const guardarReportesSemanales = (reportes: ReporteSemanal[]) => {
-  try {
-    localStorage.setItem(STORAGE_KEYS.REPORTES_SEMANALES, JSON.stringify(reportes));
-  } catch (error) {
-    console.error('Error guardando reportes semanales:', error);
-  }
+  return guardarConBackup(STORAGE_KEYS.REPORTES_SEMANALES, reportes);
 };
 
 const cargarReportesSemanales = (): ReporteSemanal[] => {
-  try {
-    const data = localStorage.getItem(STORAGE_KEYS.REPORTES_SEMANALES);
-    return data ? JSON.parse(data) : [];
-  } catch (error) {
-    console.error('Error cargando reportes semanales:', error);
-    return [];
+  return cargarConRecuperacion(STORAGE_KEYS.REPORTES_SEMANALES, []);
+};
+
+// Función para verificar integridad de datos
+const verificarIntegridadDatos = () => {
+  const reportes = cargarReportesDiarios();
+  const personal = cargarPersonal();
+  const reportesSemanales = cargarReportesSemanales();
+
+  console.log('=== VERIFICACIÓN DE INTEGRIDAD ===');
+  console.log('Reportes diarios:', reportes.length);
+  console.log('Personal:', personal.length);
+  console.log('Reportes semanales:', reportesSemanales.length);
+
+  // Verificar si hay datos
+  const hayDatos = reportes.length > 0 || personal.length > 0 || reportesSemanales.length > 0;
+  console.log('¿Hay datos guardados?:', hayDatos ? '✅ SÍ' : '❌ NO');
+
+  return { reportes, personal, reportesSemanales, hayDatos };
+};
+
+// Función para exportar todos los datos (backup manual)
+const exportarDatos = () => {
+  const datos = {
+    reportesDiarios: cargarReportesDiarios(),
+    personal: cargarPersonal(),
+    reportesSemanales: cargarReportesSemanales(),
+    timestamp: Date.now(),
+    version: '1.0'
+  };
+
+  const blob = new Blob([JSON.stringify(datos, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `backup-control-caja-${new Date().toISOString().split('T')[0]}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
+
+// Función para importar datos desde backup
+const importarDatos = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const file = event.target.files?.[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const datos = JSON.parse(e.target?.result as string);
+
+      if (datos.reportesDiarios) guardarReportesDiarios(datos.reportesDiarios);
+      if (datos.personal) guardarPersonal(datos.personal);
+      if (datos.reportesSemanales) guardarReportesSemanales(datos.reportesSemanales);
+
+      // Recargar la página para aplicar los cambios
+      window.location.reload();
+    } catch (error) {
+      console.error('Error importando datos:', error);
+      alert('Error al importar el archivo. Verifica que sea un archivo de backup válido.');
+    }
+  };
+  reader.readAsText(file);
+};
+
+// Función para limpiar todos los datos (con confirmación)
+const limpiarTodosLosDatos = () => {
+  if (window.confirm('¿Estás seguro de que quieres eliminar TODOS los datos? Esta acción no se puede deshacer.')) {
+    localStorage.clear();
+    window.location.reload();
   }
 };
 
@@ -139,6 +283,7 @@ export default function Home() {
 
   // Estados para reportes semanales
   const [reportesSemanales, setReportesSemanales] = useState<ReporteSemanal[]>([]);
+  const [mostrarConfiguracion, setMostrarConfiguracion] = useState(false);
 
   // Funciones helper para actualizar estado con localStorage
   const actualizarReportesDiarios = (nuevosReportes: ReporteDiario[]) => {
@@ -180,11 +325,24 @@ export default function Home() {
     return cierres.sort((a, b) => new Date(b.fecha.split('/').reverse().join('-')).getTime() - new Date(a.fecha.split('/').reverse().join('-')).getTime());
   };
 
-  // Cargar datos del localStorage al iniciar
+  // Cargar datos del localStorage al iniciar con verificación
   useEffect(() => {
-    setReportesDiarios(cargarReportesDiarios());
-    setPersonal(cargarPersonal());
-    setReportesSemanales(cargarReportesSemanales());
+    console.log('=== INICIANDO CARGA DE DATOS ===');
+
+    // Verificar disponibilidad de localStorage
+    if (!isLocalStorageAvailable()) {
+      console.error('localStorage no está disponible. Los datos no se guardarán.');
+      alert('Advertencia: localStorage no está disponible. Los datos no se guardarán entre sesiones.');
+    }
+
+    // Cargar datos con verificación
+    const datosCargados = verificarIntegridadDatos();
+
+    setReportesDiarios(datosCargados.reportes);
+    setPersonal(datosCargados.personal);
+    setReportesSemanales(datosCargados.reportesSemanales);
+
+    console.log('=== CARGA DE DATOS COMPLETADA ===');
   }, []);
 
   // Guardar automáticamente antes de que se recargue la página
@@ -1371,6 +1529,104 @@ export default function Home() {
             )}
           </div>
         )}
+
+        {/* Módulo de Configuración */}
+        {activeTab === 'configuracion' && (
+          <div className="space-y-6">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <div className="flex items-center gap-2 mb-6">
+                <div className="text-2xl">⚙️</div>
+                <h2 className="text-2xl font-bold text-gray-800">
+                  Configuración y Backup
+                </h2>
+              </div>
+
+              {/* Estado de los datos */}
+              <div className="space-y-6">
+                <div className="bg-gray-50 p-6 rounded-lg">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Estado de los Datos</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="bg-white p-4 rounded border">
+                      <div className="text-sm text-gray-600">Reportes Diarios</div>
+                      <div className="text-2xl font-bold text-blue-600">{reportesDiarios.length}</div>
+                    </div>
+                    <div className="bg-white p-4 rounded border">
+                      <div className="text-sm text-gray-600">Personal</div>
+                      <div className="text-2xl font-bold text-green-600">{personal.length}</div>
+                    </div>
+                    <div className="bg-white p-4 rounded border">
+                      <div className="text-sm text-gray-600">Reportes Semanales</div>
+                      <div className="text-2xl font-bold text-purple-600">{reportesSemanales.length}</div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 p-4 bg-blue-50 rounded border border-blue-200">
+                    <div className="text-sm text-blue-800">
+                      <strong>Último backup automático:</strong> {localStorage.getItem(STORAGE_KEYS.BACKUP_TIMESTAMP) ?
+                        new Date(parseInt(localStorage.getItem(STORAGE_KEYS.BACKUP_TIMESTAMP)!)).toLocaleString('es-ES') :
+                        'Nunca'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Backup y Restauración */}
+                <div className="bg-white p-6 rounded-lg border border-gray-200">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Backup y Restauración</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <button
+                        onClick={exportarDatos}
+                        className="w-full bg-green-600 text-white py-3 px-6 rounded-lg hover:bg-green-700 transition-colors font-medium"
+                      >
+                        📥 Exportar Backup (Descargar)
+                      </button>
+                      <p className="text-sm text-gray-600 mt-2">
+                        Descarga un archivo con todos tus datos para guardarlo como respaldo.
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block w-full bg-blue-600 text-white py-3 px-6 rounded-lg hover:bg-blue-700 transition-colors cursor-pointer text-center font-medium">
+                        📤 Importar Backup
+                        <input
+                          type="file"
+                          accept=".json"
+                          onChange={importarDatos}
+                          className="hidden"
+                        />
+                      </label>
+                      <p className="text-sm text-gray-600 mt-2">
+                        Carga un archivo de backup previamente descargado.
+                      </p>
+                    </div>
+
+                    <div className="border-t pt-4">
+                      <button
+                        onClick={limpiarTodosLosDatos}
+                        className="w-full bg-red-600 text-white py-3 px-6 rounded-lg hover:bg-red-700 transition-colors font-medium"
+                      >
+                        🗑️ Limpiar Todos los Datos
+                      </button>
+                      <p className="text-sm text-red-600 mt-2">
+                        ⚠️ Esta acción eliminará permanentemente todos los datos guardados.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Información del sistema */}
+                <div className="bg-white p-6 rounded-lg border border-gray-200">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Información del Sistema</h3>
+                  <div className="space-y-2 text-sm text-gray-600">
+                    <div><strong>localStorage disponible:</strong> {isLocalStorageAvailable() ? '✅ Sí' : '❌ No'}</div>
+                    <div><strong>Versión de la app:</strong> 1.0</div>
+                    <div><strong>Última actualización:</strong> {new Date().toLocaleString('es-ES')}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
 
       {/* Bottom Navigation */}
@@ -1422,6 +1678,18 @@ export default function Home() {
           >
             <Calendar size={32} />
             <span className="text-sm mt-2 font-medium">Semanal</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('configuracion')}
+            className={`flex flex-col items-center p-4 rounded-2xl transition-all duration-200 ${
+              activeTab === 'configuracion'
+                ? 'text-white bg-gray-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-600 hover:bg-gray-50'
+            }`}
+          >
+            <Settings size={32} />
+            <span className="text-sm mt-2 font-medium">Config</span>
           </button>
         </div>
       </nav>
