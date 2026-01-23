@@ -2,6 +2,30 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Calculator, FileText, Users, Plus, Banknote, User, Clock, X, Calendar, Settings } from 'lucide-react';
+import { createClient } from '@supabase/supabase-js';
+
+// Configuración de Supabase
+// ⚠️ IMPORTANTE: Reemplaza estos valores con tus credenciales reales de Supabase
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://tu-proyecto.supabase.co';
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'tu-anon-key-aqui';
+
+// Crear cliente de Supabase
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// Verificar conexión con Supabase
+const verificarConexionSupabase = async (): Promise<boolean> => {
+  try {
+    const { data, error } = await supabase.from('reportes_diarios').select('count').limit(1);
+    if (error && error.code !== 'PGRST116') { // PGRST116 es "no rows returned"
+      console.error('Error conectando a Supabase:', error);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error('Error de conexión con Supabase:', error);
+    return false;
+  }
+};
 
 // Interfaces para tipos TypeScript
 interface Venta {
@@ -249,10 +273,190 @@ const importarDatos = (event: React.ChangeEvent<HTMLInputElement>) => {
   reader.readAsText(file);
 };
 
+// === FUNCIONES DE SINCRONIZACIÓN CON SUPABASE ===
+
+// Función para sincronizar reportes diarios con Supabase
+const sincronizarReportesDiarios = async (reportes: ReporteDiario[]) => {
+  if (!await verificarConexionSupabase()) {
+    console.warn('Supabase no disponible, usando solo localStorage');
+    return false;
+  }
+
+  try {
+    // Primero obtener todos los reportes existentes en Supabase
+    const { data: existentes, error: errorSelect } = await supabase
+      .from('reportes_diarios')
+      .select('id');
+
+    if (errorSelect) {
+      console.error('Error obteniendo reportes existentes:', errorSelect);
+      return false;
+    }
+
+    const idsExistentes = existentes?.map(r => r.id) || [];
+
+    // Filtrar reportes nuevos/actualizados
+    const reportesParaSubir = reportes.filter(reporte =>
+      !idsExistentes.includes(reporte.id) ||
+      reporte.timestamp > (existentes?.find(e => e.id === reporte.id)?.timestamp || 0)
+    );
+
+    if (reportesParaSubir.length > 0) {
+      // Usar upsert para insertar o actualizar
+      const { error: errorUpsert } = await supabase
+        .from('reportes_diarios')
+        .upsert(reportesParaSubir, { onConflict: 'id' });
+
+      if (errorUpsert) {
+        console.error('Error subiendo reportes a Supabase:', errorUpsert);
+        return false;
+      }
+
+      console.log(`${reportesParaSubir.length} reportes sincronizados con Supabase`);
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error en sincronización de reportes:', error);
+    return false;
+  }
+};
+
+// Función para sincronizar personal con Supabase
+const sincronizarPersonal = async (personal: Personal[]) => {
+  if (!await verificarConexionSupabase()) return false;
+
+  try {
+    const { error } = await supabase
+      .from('personal')
+      .upsert(personal, { onConflict: 'id' });
+
+    if (error) {
+      console.error('Error sincronizando personal:', error);
+      return false;
+    }
+
+    console.log(`${personal.length} registros de personal sincronizados`);
+    return true;
+  } catch (error) {
+    console.error('Error en sincronización de personal:', error);
+    return false;
+  }
+};
+
+// Función para sincronizar reportes semanales con Supabase
+const sincronizarReportesSemanales = async (reportes: ReporteSemanal[]) => {
+  if (!await verificarConexionSupabase()) return false;
+
+  try {
+    const { error } = await supabase
+      .from('reportes_semanales')
+      .upsert(reportes, { onConflict: 'timestamp' });
+
+    if (error) {
+      console.error('Error sincronizando reportes semanales:', error);
+      return false;
+    }
+
+    console.log(`${reportes.length} reportes semanales sincronizados`);
+    return true;
+  } catch (error) {
+    console.error('Error en sincronización de reportes semanales:', error);
+    return false;
+  }
+};
+
+// Función para descargar datos desde Supabase (para sincronización inicial)
+const descargarDatosDesdeSupabase = async () => {
+  if (!await verificarConexionSupabase()) {
+    console.warn('Supabase no disponible para descarga');
+    return null;
+  }
+
+  try {
+    const [reportesResult, personalResult, semanalesResult] = await Promise.all([
+      supabase.from('reportes_diarios').select('*'),
+      supabase.from('personal').select('*'),
+      supabase.from('reportes_semanales').select('*')
+    ]);
+
+    if (reportesResult.error || personalResult.error || semanalesResult.error) {
+      console.error('Error descargando datos:', {
+        reportes: reportesResult.error,
+        personal: personalResult.error,
+        semanales: semanalesResult.error
+      });
+      return null;
+    }
+
+    return {
+      reportesDiarios: reportesResult.data || [],
+      personal: personalResult.data || [],
+      reportesSemanales: semanalesResult.data || []
+    };
+  } catch (error) {
+    console.error('Error descargando datos desde Supabase:', error);
+    return null;
+  }
+};
+
+// Función para sincronizar todo (subir y bajar datos)
+const sincronizarTodo = async () => {
+  const reportes = cargarReportesDiarios();
+  const personal = cargarPersonal();
+  const reportesSemanales = cargarReportesSemanales();
+
+  // Subir datos locales a Supabase
+  const subidaExitosa = await Promise.all([
+    sincronizarReportesDiarios(reportes),
+    sincronizarPersonal(personal),
+    sincronizarReportesSemanales(reportesSemanales)
+  ]);
+
+  // Intentar descargar datos más recientes desde Supabase
+  const datosRemotos = await descargarDatosDesdeSupabase();
+
+  if (datosRemotos) {
+    // Fusionar datos: mantener los más recientes
+    const reportesFusionados = fusionarDatos(reportes, datosRemotos.reportesDiarios);
+    const personalFusionado = fusionarDatos(personal, datosRemotos.personal);
+    const semanalesFusionados = fusionarDatos(reportesSemanales, datosRemotos.reportesSemanales);
+
+    // Actualizar estado y localStorage
+    actualizarReportesDiarios(reportesFusionados);
+    actualizarPersonal(personalFusionado);
+    actualizarReportesSemanales(semanalesFusionados);
+
+    return true;
+  }
+
+  return subidaExitosa.every(success => success);
+};
+
+// Función para fusionar datos locales y remotos (mantener el más reciente)
+const fusionarDatos = <T extends { timestamp: number; id: string | number }>(
+  locales: T[],
+  remotos: T[]
+): T[] => {
+  const todos = [...locales, ...remotos];
+  const mapa = new Map<string | number, T>();
+
+  todos.forEach(item => {
+    const existente = mapa.get(item.id);
+    if (!existente || item.timestamp > existente.timestamp) {
+      mapa.set(item.id, item);
+    }
+  });
+
+  return Array.from(mapa.values());
+};
+
 // Función para limpiar todos los datos (con confirmación)
 const limpiarTodosLosDatos = () => {
   if (window.confirm('¿Estás seguro de que quieres eliminar TODOS los datos? Esta acción no se puede deshacer.')) {
     localStorage.clear();
+    // También limpiar de Supabase si está disponible
+    sincronizarTodo(); // Esto subirá arrays vacíos
     window.location.reload();
   }
 };
@@ -354,20 +558,32 @@ export default function Home() {
   const [mostrarConfiguracion, setMostrarConfiguracion] = useState(false);
   const [codigoSincronizacion, setCodigoSincronizacion] = useState('');
 
-  // Funciones helper para actualizar estado con localStorage
-  const actualizarReportesDiarios = (nuevosReportes: ReporteDiario[]) => {
+  // Funciones helper para actualizar estado con localStorage y Supabase
+  const actualizarReportesDiarios = async (nuevosReportes: ReporteDiario[]) => {
     setReportesDiarios(nuevosReportes);
     guardarReportesDiarios(nuevosReportes);
+    // Sincronizar con Supabase en segundo plano
+    sincronizarReportesDiarios(nuevosReportes).catch(error =>
+      console.warn('Error sincronizando reportes con Supabase:', error)
+    );
   };
 
-  const actualizarPersonal = (nuevoPersonal: Personal[]) => {
+  const actualizarPersonal = async (nuevoPersonal: Personal[]) => {
     setPersonal(nuevoPersonal);
     guardarPersonal(nuevoPersonal);
+    // Sincronizar con Supabase en segundo plano
+    sincronizarPersonal(nuevoPersonal).catch(error =>
+      console.warn('Error sincronizando personal con Supabase:', error)
+    );
   };
 
-  const actualizarReportesSemanales = (nuevosReportes: ReporteSemanal[]) => {
+  const actualizarReportesSemanales = async (nuevosReportes: ReporteSemanal[]) => {
     setReportesSemanales(nuevosReportes);
     guardarReportesSemanales(nuevosReportes);
+    // Sincronizar con Supabase en segundo plano
+    sincronizarReportesSemanales(nuevosReportes).catch(error =>
+      console.warn('Error sincronizando reportes semanales con Supabase:', error)
+    );
   };
 
   // Función para calcular cierres diarios disponibles
@@ -380,13 +596,13 @@ export default function Home() {
       const turnoManana = reportesDia.find(r => r.turno === '8-15');
       const turnoTarde = reportesDia.find(r => r.turno === '15-22');
 
-      // Solo crear cierre si hay turno tarde (que es cuando se genera el cierre)
-      if (turnoTarde) {
+      // Mostrar todos los días que tienen al menos un turno registrado
+      if (turnoManana || turnoTarde) {
         cierres.push({
           fecha,
           turnoManana: turnoManana || null,
-          turnoTarde,
-          totalDia: (turnoManana ? turnoManana.total : 0) + turnoTarde.total
+          turnoTarde: turnoTarde || null,
+          totalDia: (turnoManana ? turnoManana.total : 0) + (turnoTarde ? turnoTarde.total : 0)
         });
       }
     });
@@ -394,24 +610,108 @@ export default function Home() {
     return cierres.sort((a, b) => new Date(b.fecha.split('/').reverse().join('-')).getTime() - new Date(a.fecha.split('/').reverse().join('-')).getTime());
   };
 
-  // Cargar datos del localStorage al iniciar con verificación
-  useEffect(() => {
-    console.log('=== INICIANDO CARGA DE DATOS ===');
+  // Función para inicializar turnos del día actual
+  const inicializarTurnosDelDia = (reportesActuales: ReporteDiario[]) => {
+    const hoy = new Date();
+    const fechaHoy = hoy.toLocaleDateString('es-ES');
+    let reportesActualizados = [...reportesActuales];
 
-    // Verificar disponibilidad de localStorage
-    if (!isLocalStorageAvailable()) {
-      console.error('localStorage no está disponible. Los datos no se guardarán.');
-      alert('Advertencia: localStorage no está disponible. Los datos no se guardarán entre sesiones.');
+    // Verificar si ya existen reportes para hoy
+    const reportesHoy = reportesActuales.filter(r => r.fecha === fechaHoy);
+
+    // Si no hay reportes para hoy, crear los turnos vacíos
+    if (reportesHoy.length === 0) {
+      const turnoManana: ReporteDiario = {
+        id: fechaHoy + '-8-15',
+        fecha: fechaHoy,
+        turno: '8-15',
+        horaInicio: fechaHoy + ' 08:00',
+        horaCambio: fechaHoy + ' 15:00',
+        empleada: '',
+        cajaInicial: 0,
+        ventas: [],
+        ingresoEfectivo: 0,
+        ingresoTransferencia: 0,
+        total: 0,
+        timestamp: hoy.getTime()
+      };
+
+      const turnoTarde: ReporteDiario = {
+        id: fechaHoy + '-15-22',
+        fecha: fechaHoy,
+        turno: '15-22',
+        horaInicio: fechaHoy + ' 15:00',
+        horaCambio: fechaHoy + ' 22:00',
+        empleada: '',
+        cajaInicial: 0,
+        ventas: [],
+        ingresoEfectivo: 0,
+        ingresoTransferencia: 0,
+        total: 0,
+        timestamp: hoy.getTime()
+      };
+
+      reportesActualizados.push(turnoManana, turnoTarde);
+      actualizarReportesDiarios(reportesActualizados);
+
+      console.log('Turnos del día inicializados automáticamente');
     }
 
-    // Cargar datos con verificación
-    const datosCargados = verificarIntegridadDatos();
+    return reportesActualizados;
+  };
 
-    setReportesDiarios(datosCargados.reportes);
-    setPersonal(datosCargados.personal);
-    setReportesSemanales(datosCargados.reportesSemanales);
+  // Cargar datos del localStorage y Supabase al iniciar
+  useEffect(() => {
+    const cargarDatosIniciales = async () => {
+      console.log('=== INICIANDO CARGA DE DATOS ===');
 
-    console.log('=== CARGA DE DATOS COMPLETADA ===');
+      // Verificar disponibilidad de localStorage
+      if (!isLocalStorageAvailable()) {
+        console.error('localStorage no está disponible. Los datos no se guardarán.');
+        alert('Advertencia: localStorage no está disponible. Los datos no se guardarán entre sesiones.');
+      }
+
+      // Cargar datos locales primero
+      const datosLocales = verificarIntegridadDatos();
+
+      // Intentar sincronizar con Supabase
+      const conexionSupabase = await verificarConexionSupabase();
+      let datosFinales = datosLocales;
+
+      if (conexionSupabase) {
+        console.log('✅ Conectado a Supabase, sincronizando datos...');
+
+        // Intentar descargar datos de Supabase
+        const datosRemotos = await descargarDatosDesdeSupabase();
+
+        if (datosRemotos) {
+          // Fusionar datos locales y remotos
+          datosFinales = {
+            reportes: fusionarDatos(datosLocales.reportes, datosRemotos.reportesDiarios),
+            personal: fusionarDatos(datosLocales.personal, datosRemotos.personal),
+            reportesSemanales: fusionarDatos(datosLocales.reportesSemanales, datosRemotos.reportesSemanales)
+          };
+
+          console.log('✅ Datos fusionados con Supabase');
+        } else {
+          console.log('⚠️ No se pudieron descargar datos de Supabase, usando datos locales');
+        }
+      } else {
+        console.log('⚠️ Supabase no disponible, usando solo datos locales');
+      }
+
+      // Inicializar turnos del día actual si no existen
+      const reportesConTurnosDelDia = inicializarTurnosDelDia(datosFinales.reportes);
+
+      // Actualizar estado
+      setReportesDiarios(reportesConTurnosDelDia);
+      setPersonal(datosFinales.personal);
+      setReportesSemanales(datosFinales.reportesSemanales);
+
+      console.log('=== CARGA DE DATOS COMPLETADA ===');
+    };
+
+    cargarDatosIniciales();
   }, []);
 
   // Guardar automáticamente antes de que se recargue la página
@@ -574,30 +874,67 @@ export default function Home() {
       timestamp: ahora.getTime()
     };
 
+    // Asegurar que ambos turnos estén guardados en la memoria
+    let nuevosReportes = [...reportesDiarios];
+
     // Verificar si ya existe un reporte para este turno del día
-    const reporteExistenteIndex = reportesDiarios.findIndex(r => r.id === reporte.id);
+    const reporteExistenteIndex = nuevosReportes.findIndex(r => r.id === reporte.id);
 
     if (reporteExistenteIndex >= 0) {
-      const nuevosReportes = [...reportesDiarios];
+      // Actualizar el reporte existente
       nuevosReportes[reporteExistenteIndex] = reporte;
-      actualizarReportesDiarios(nuevosReportes);
-      setMensaje('Reporte actualizado');
+      setMensaje('Reporte actualizado - Ambos turnos guardados');
     } else {
-      actualizarReportesDiarios([...reportesDiarios, reporte]);
-      setMensaje(`Reporte guardado`);
+      // Agregar el nuevo reporte
+      nuevosReportes.push(reporte);
+      setMensaje(`Reporte guardado - Ambos turnos guardados en memoria`);
     }
 
-    // Si es turno tarde, mostrar cierre diario
-    if (turnoSeleccionado === '15-22') {
-      const reporteManana = reportesDiarios.find(r => r.fecha === fechaHoy && r.turno === '8-15');
-      const cierreDelDia = {
+    // Crear automáticamente el turno opuesto si no existe
+    const turnoOpuesto = turnoSeleccionado === '8-15' ? '15-22' : '8-15';
+    const idTurnoOpuesto = fechaHoy + '-' + turnoOpuesto;
+    const existeTurnoOpuesto = nuevosReportes.findIndex(r => r.id === idTurnoOpuesto);
+
+    if (existeTurnoOpuesto === -1) {
+      // Crear un reporte vacío para el turno opuesto
+      const horasTurnoOpuesto = turnoOpuesto === '8-15'
+        ? { horaInicio: fechaHoy + ' 08:00', horaCambio: fechaHoy + ' 15:00' }
+        : { horaInicio: fechaHoy + ' 15:00', horaCambio: fechaHoy + ' 22:00' };
+
+      const reporteTurnoOpuesto: ReporteDiario = {
+        id: idTurnoOpuesto,
         fecha: fechaHoy,
-        turnoManana: reporteManana || null,
-        turnoTarde: reporte,
-        totalDia: (reporteManana ? reporteManana.total : 0) + reporte.total
+        turno: turnoOpuesto,
+        horaInicio: horasTurnoOpuesto.horaInicio,
+        horaCambio: horasTurnoOpuesto.horaCambio,
+        empleada: '', // Se completará cuando se registre
+        cajaInicial: 0, // Se completará cuando se registre
+        ventas: [],
+        ingresoEfectivo: 0,
+        ingresoTransferencia: 0,
+        total: 0,
+        timestamp: ahora.getTime()
       };
-      setCierreDiario(cierreDelDia);
-      setMostrarCierreDiario(true);
+
+      nuevosReportes.push(reporteTurnoOpuesto);
+    }
+
+    // Guardar todos los reportes (ambos turnos)
+    actualizarReportesDiarios(nuevosReportes);
+
+    // Mostrar cierre diario si es turno tarde y existe turno mañana
+    if (turnoSeleccionado === '15-22') {
+      const reporteManana = nuevosReportes.find(r => r.fecha === fechaHoy && r.turno === '8-15');
+      if (reporteManana && reporteManana.empleada && reporteManana.cajaInicial > 0) {
+        const cierreDelDia = {
+          fecha: fechaHoy,
+          turnoManana: reporteManana,
+          turnoTarde: reporte,
+          totalDia: reporteManana.total + reporte.total
+        };
+        setCierreDiario(cierreDelDia);
+        setMostrarCierreDiario(true);
+      }
     }
 
     // Limpiar formulario pero mantener turno y empleado
@@ -1766,16 +2103,36 @@ export default function Home() {
                       </p>
                     </div>
 
-                    <div className="border-t pt-4">
+                    <div className="border-t pt-4 space-y-3">
                       <button
-                        onClick={limpiarTodosLosDatos}
-                        className="w-full bg-red-600 text-white py-3 px-6 rounded-lg hover:bg-red-700 transition-colors font-medium"
+                        onClick={async () => {
+                          const exito = await sincronizarTodo();
+                          if (exito) {
+                            alert('✅ Sincronización completada. Los datos están actualizados en todos tus dispositivos.');
+                            window.location.reload();
+                          } else {
+                            alert('❌ Error en la sincronización. Verifica tu conexión a internet.');
+                          }
+                        }}
+                        className="w-full bg-green-600 text-white py-3 px-6 rounded-lg hover:bg-green-700 transition-colors font-medium"
                       >
-                        🗑️ Limpiar Todos los Datos
+                        🔄 Sincronizar con la Nube
                       </button>
-                      <p className="text-sm text-red-600 mt-2">
-                        ⚠️ Esta acción eliminará permanentemente todos los datos guardados.
+                      <p className="text-sm text-gray-600">
+                        Sincroniza tus datos con Supabase para acceder desde cualquier dispositivo.
                       </p>
+
+                      <div className="border-t pt-3">
+                        <button
+                          onClick={limpiarTodosLosDatos}
+                          className="w-full bg-red-600 text-white py-3 px-6 rounded-lg hover:bg-red-700 transition-colors font-medium"
+                        >
+                          🗑️ Limpiar Todos los Datos
+                        </button>
+                        <p className="text-sm text-red-600 mt-2">
+                          ⚠️ Esta acción eliminará permanentemente todos los datos guardados.
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1785,8 +2142,17 @@ export default function Home() {
                   <h3 className="text-lg font-semibold text-gray-800 mb-4">Información del Sistema</h3>
                   <div className="space-y-2 text-sm text-gray-600">
                     <div><strong>localStorage disponible:</strong> {isLocalStorageAvailable() ? '✅ Sí' : '❌ No'}</div>
+                    <div><strong>Supabase conectado:</strong> {verificarConexionSupabase() ? '✅ Sí' : '❌ No'}</div>
                     <div><strong>Versión de la app:</strong> 1.0</div>
                     <div><strong>Última actualización:</strong> {new Date().toLocaleString('es-ES')}</div>
+                    <div className="mt-3 p-3 bg-blue-50 rounded border">
+                      <p className="text-xs text-blue-800">
+                        <strong>💡 Consejos:</strong><br/>
+                        • Los datos se guardan automáticamente en localStorage y Supabase<br/>
+                        • Si Supabase no está disponible, funciona solo con localStorage<br/>
+                        • Usa "Sincronizar con la Nube" para forzar actualización
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>

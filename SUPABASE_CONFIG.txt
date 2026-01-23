@@ -1,0 +1,50 @@
+# Configuración de Supabase
+# Obtén estos valores desde https://supabase.com/dashboard/project/[tu-proyecto]/settings/api
+
+# URL de tu proyecto Supabase
+NEXT_PUBLIC_SUPABASE_URL=https://tu-proyecto.supabase.co
+
+# Clave anónima (public) de Supabase
+NEXT_PUBLIC_SUPABASE_ANON_KEY=tu-anon-key-aqui
+
+# Instrucciones para configurar Supabase:
+# 1. Ve a https://supabase.com y crea una cuenta gratis
+# 2. Crea un nuevo proyecto
+# 3. Ve a Settings > API
+# 4. Copia la URL del proyecto y la anon key
+# 5. Crea un archivo .env.local en la raíz del proyecto
+# 6. Agrega las variables de arriba con tus valores reales
+# 7. Reinicia la aplicación
+
+# SQL para crear las tablas en Supabase:
+#
+# CREATE TABLE reportes_diarios (
+#   id TEXT PRIMARY KEY,
+#   fecha TEXT NOT NULL,
+#   turno TEXT NOT NULL,
+#   hora_inicio TEXT,
+#   hora_cambio TEXT,
+#   empleada TEXT,
+#   caja_inicial INTEGER DEFAULT 0,
+#   ventas JSONB DEFAULT '[]',
+#   ingreso_efectivo INTEGER DEFAULT 0,
+#   ingreso_transferencia INTEGER DEFAULT 0,
+#   total INTEGER DEFAULT 0,
+#   timestamp BIGINT NOT NULL
+# );
+#
+# CREATE TABLE personal (
+#   id INTEGER PRIMARY KEY,
+#   nombre TEXT NOT NULL,
+#   activo BOOLEAN DEFAULT true
+# );
+#
+# CREATE TABLE reportes_semanales (
+#   timestamp BIGINT PRIMARY KEY,
+#   semana TEXT NOT NULL,
+#   total_semana INTEGER DEFAULT 0,
+#   total_manana INTEGER DEFAULT 0,
+#   total_tarde INTEGER DEFAULT 0,
+#   dias_trabajados INTEGER DEFAULT 0,
+#   reportes JSONB DEFAULT '[]'
+# );
