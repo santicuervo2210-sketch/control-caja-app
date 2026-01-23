@@ -7,44 +7,91 @@ NEXT_PUBLIC_SUPABASE_URL=https://tu-proyecto.supabase.co
 # Clave anónima (public) de Supabase
 NEXT_PUBLIC_SUPABASE_ANON_KEY=tu-anon-key-aqui
 
-# Instrucciones para configurar Supabase:
-# 1. Ve a https://supabase.com y crea una cuenta gratis
-# 2. Crea un nuevo proyecto
-# 3. Ve a Settings > API
-# 4. Copia la URL del proyecto y la anon key
-# 5. Crea un archivo .env.local en la raíz del proyecto
-# 6. Agrega las variables de arriba con tus valores reales
-# 7. Reinicia la aplicación
+# 📋 PASOS PARA CONFIGURAR SUPABASE:
+
+# 1. 🔐 Crear cuenta y proyecto:
+#    - Ve a https://supabase.com
+#    - Regístrate gratis
+#    - Crea un nuevo proyecto
+#    - Elige un nombre (ej: "control-caja-app")
+#    - Espera a que se cree (2-3 minutos)
+
+# 2. 🗄️ Crear las tablas:
+#    - Ve a "SQL Editor" en el menú lateral
+#    - Copia y pega todo el SQL de abajo
+#    - Haz clic en "Run"
+
+# 3. 🔑 Obtener las credenciales:
+#    - Ve a "Settings" > "API" en el menú lateral
+#    - Copia la "URL" del proyecto
+#    - Copia la "anon public" key
+
+# 4. ⚙️ Configurar la aplicación:
+#    - Crea un archivo llamado .env.local en la raíz del proyecto
+#    - Copia estas líneas y pega tus valores reales:
+#
+#    NEXT_PUBLIC_SUPABASE_URL=https://tu-proyecto.supabase.co
+#    NEXT_PUBLIC_SUPABASE_ANON_KEY=tu-anon-key-aqui
+#
+# 5. 🚀 Reiniciar:
+#    - Guarda el archivo .env.local
+#    - Reinicia la aplicación (npm run dev)
+#    - Ve a "Configuración" para verificar que dice "Supabase conectado: ✅ Sí"
+
+# 🎉 ¡LISTO! Ahora tus datos estarán en la nube y sincronizados entre dispositivos.
 
 # SQL para crear las tablas en Supabase:
-#
-# CREATE TABLE reportes_diarios (
-#   id TEXT PRIMARY KEY,
-#   fecha TEXT NOT NULL,
-#   turno TEXT NOT NULL,
-#   hora_inicio TEXT,
-#   hora_cambio TEXT,
-#   empleada TEXT,
-#   caja_inicial INTEGER DEFAULT 0,
-#   ventas JSONB DEFAULT '[]',
-#   ingreso_efectivo INTEGER DEFAULT 0,
-#   ingreso_transferencia INTEGER DEFAULT 0,
-#   total INTEGER DEFAULT 0,
-#   timestamp BIGINT NOT NULL
-# );
-#
-# CREATE TABLE personal (
-#   id INTEGER PRIMARY KEY,
-#   nombre TEXT NOT NULL,
-#   activo BOOLEAN DEFAULT true
-# );
-#
-# CREATE TABLE reportes_semanales (
-#   timestamp BIGINT PRIMARY KEY,
-#   semana TEXT NOT NULL,
-#   total_semana INTEGER DEFAULT 0,
-#   total_manana INTEGER DEFAULT 0,
-#   total_tarde INTEGER DEFAULT 0,
-#   dias_trabajados INTEGER DEFAULT 0,
-#   reportes JSONB DEFAULT '[]'
-# );
+# Ve a https://supabase.com/dashboard/project/[tu-proyecto]/sql/editor
+# y ejecuta este SQL:
+
+CREATE TABLE IF NOT EXISTS reportes_diarios (
+  id TEXT PRIMARY KEY,
+  fecha TEXT NOT NULL,
+  turno TEXT NOT NULL,
+  hora_inicio TEXT,
+  hora_cambio TEXT,
+  empleada TEXT,
+  caja_inicial INTEGER DEFAULT 0,
+  ventas JSONB DEFAULT '[]'::jsonb,
+  ingreso_efectivo INTEGER DEFAULT 0,
+  ingreso_transferencia INTEGER DEFAULT 0,
+  total INTEGER DEFAULT 0,
+  timestamp BIGINT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS personal (
+  id INTEGER PRIMARY KEY,
+  nombre TEXT NOT NULL,
+  activo BOOLEAN DEFAULT true,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS reportes_semanales (
+  timestamp BIGINT PRIMARY KEY,
+  semana TEXT NOT NULL,
+  total_semana INTEGER DEFAULT 0,
+  total_manana INTEGER DEFAULT 0,
+  total_tarde INTEGER DEFAULT 0,
+  dias_trabajados INTEGER DEFAULT 0,
+  reportes JSONB DEFAULT '[]'::jsonb,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+);
+
+-- Crear índices para mejor rendimiento
+CREATE INDEX IF NOT EXISTS idx_reportes_diarios_fecha ON reportes_diarios(fecha);
+CREATE INDEX IF NOT EXISTS idx_reportes_diarios_turno ON reportes_diarios(turno);
+CREATE INDEX IF NOT EXISTS idx_personal_activo ON personal(activo);
+
+-- Políticas RLS (Row Level Security) - opcional pero recomendado
+ALTER TABLE reportes_diarios ENABLE ROW LEVEL SECURITY;
+ALTER TABLE personal ENABLE ROW LEVEL SECURITY;
+ALTER TABLE reportes_semanales ENABLE ROW LEVEL SECURITY;
+
+-- Políticas para permitir acceso público (ajusta según tus necesidades de seguridad)
+CREATE POLICY "Permitir todo en reportes_diarios" ON reportes_diarios FOR ALL USING (true);
+CREATE POLICY "Permitir todo en personal" ON personal FOR ALL USING (true);
+CREATE POLICY "Permitir todo en reportes_semanales" ON reportes_semanales FOR ALL USING (true);
