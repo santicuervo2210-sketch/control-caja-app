@@ -51,12 +51,13 @@ interface CierreDiario {
   totalDia: number;
 }
 
-// Funciones para localStorage con backup
+// Funciones para localStorage con backup y sincronización
 const STORAGE_KEYS = {
   REPORTES_DIARIOS: 'control-caja-reportes-diarios',
   PERSONAL: 'control-caja-personal',
   REPORTES_SEMANALES: 'control-caja-reportes-semanales',
-  BACKUP_TIMESTAMP: 'control-caja-backup-timestamp'
+  BACKUP_TIMESTAMP: 'control-caja-backup-timestamp',
+  DISPOSITIVO_ID: 'control-caja-dispositivo-id'
 };
 
 // Función para verificar si localStorage está disponible
@@ -256,6 +257,73 @@ const limpiarTodosLosDatos = () => {
   }
 };
 
+// Función para generar código de sincronización
+const generarCodigoSincronizacion = () => {
+  const datos = {
+    reportesDiarios: cargarReportesDiarios(),
+    personal: cargarPersonal(),
+    reportesSemanales: cargarReportesSemanales(),
+    timestamp: Date.now(),
+    dispositivoOrigen: localStorage.getItem(STORAGE_KEYS.DISPOSITIVO_ID) || 'desconocido',
+    version: '1.0'
+  };
+
+  // Convertir a base64 para compartir fácilmente
+  const datosString = JSON.stringify(datos);
+  const codigo = btoa(datosString);
+
+  return codigo;
+};
+
+// Función para aplicar código de sincronización
+const aplicarCodigoSincronizacion = (codigo: string) => {
+  try {
+    const datosString = atob(codigo);
+    const datos = JSON.parse(datosString);
+
+    if (datos.reportesDiarios) guardarReportesDiarios(datos.reportesDiarios);
+    if (datos.personal) guardarPersonal(datos.personal);
+    if (datos.reportesSemanales) guardarReportesSemanales(datos.reportesSemanales);
+
+    // Actualizar ID de dispositivo si no existe
+    if (!localStorage.getItem(STORAGE_KEYS.DISPOSITIVO_ID)) {
+      localStorage.setItem(STORAGE_KEYS.BACKUP_TIMESTAMP, datos.dispositivoOrigen || 'sincronizado');
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error aplicando código de sincronización:', error);
+    return false;
+  }
+};
+
+// Función para compartir datos vía WhatsApp/Telegram
+const compartirDatosViaApp = () => {
+  const codigo = generarCodigoSincronizacion();
+  const mensaje = `Código de sincronización Control de Caja:\n\n${codigo}\n\nComparte este código con otro dispositivo para sincronizar los datos.`;
+  const url = `https://wa.me/?text=${encodeURIComponent(mensaje)}`;
+
+  window.open(url, '_blank');
+};
+
+// Función para copiar código al portapapeles
+const copiarCodigoAlPortapapeles = async () => {
+  const codigo = generarCodigoSincronizacion();
+  try {
+    await navigator.clipboard.writeText(codigo);
+    alert('Código copiado al portapapeles. Pégalo en el otro dispositivo.');
+  } catch (error) {
+    // Fallback para navegadores que no soportan clipboard API
+    const textArea = document.createElement('textarea');
+    textArea.value = codigo;
+    document.body.appendChild(textArea);
+    textArea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textArea);
+    alert('Código copiado al portapapeles. Pégalo en el otro dispositivo.');
+  }
+};
+
 export default function Home() {
   const [activeTab, setActiveTab] = useState('reportes');
 
@@ -284,6 +352,7 @@ export default function Home() {
   // Estados para reportes semanales
   const [reportesSemanales, setReportesSemanales] = useState<ReporteSemanal[]>([]);
   const [mostrarConfiguracion, setMostrarConfiguracion] = useState(false);
+  const [codigoSincronizacion, setCodigoSincronizacion] = useState('');
 
   // Funciones helper para actualizar estado con localStorage
   const actualizarReportesDiarios = (nuevosReportes: ReporteDiario[]) => {
@@ -664,6 +733,34 @@ export default function Home() {
           <div className="text-lg font-medium text-gray-800">{mensaje}</div>
         </div>
       )}
+
+      {/* Notificación de Sincronización (solo primera vez) */}
+      {(() => {
+        const notificacionVista = localStorage.getItem('control-caja-notificacion-sincronizacion-vista');
+        if (notificacionVista) return null;
+
+        return (
+          <div className="fixed bottom-24 left-4 right-4 z-40 bg-blue-600 text-white p-4 rounded-lg shadow-xl">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <h4 className="font-semibold mb-1">📱 Datos independientes por dispositivo</h4>
+                <p className="text-sm opacity-90">
+                  Los datos se guardan localmente en cada dispositivo. Ve a "Configuración" para sincronizar entre dispositivos.
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  localStorage.setItem('control-caja-notificacion-sincronizacion-vista', 'true');
+                  window.location.reload();
+                }}
+                className="ml-3 text-blue-200 hover:text-white text-xl"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Main Content */}
       <main className="p-4 max-w-4xl mx-auto">
@@ -1569,9 +1666,78 @@ export default function Home() {
                   </div>
                 </div>
 
+                {/* Sincronización entre Dispositivos */}
+                <div className="bg-blue-50 p-6 rounded-lg border border-blue-200">
+                  <h3 className="text-lg font-semibold text-blue-800 mb-4">🔄 Sincronización entre Dispositivos</h3>
+                  <div className="space-y-4">
+                    <div className="bg-white p-4 rounded border">
+                      <p className="text-sm text-gray-600 mb-3">
+                        <strong>¿Por qué los datos no se comparten automáticamente?</strong><br/>
+                        Cada dispositivo guarda sus datos localmente. Usa estos códigos para sincronizar.
+                      </p>
+
+                      <div className="space-y-3">
+                        <button
+                          onClick={() => {
+                            const codigo = generarCodigoSincronizacion();
+                            setCodigoSincronizacion(codigo);
+                          }}
+                          className="w-full bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 transition-colors text-sm font-medium"
+                        >
+                          📱 Generar Código de Sincronización
+                        </button>
+
+                        {codigoSincronizacion && (
+                          <div className="bg-gray-100 p-3 rounded border">
+                            <p className="text-xs text-gray-600 mb-2">Código generado:</p>
+                            <p className="text-xs font-mono break-all bg-white p-2 rounded border">{codigoSincronizacion}</p>
+                            <div className="flex gap-2 mt-2">
+                              <button
+                                onClick={copiarCodigoAlPortapapeles}
+                                className="flex-1 bg-green-600 text-white py-1 px-3 rounded text-xs hover:bg-green-700"
+                              >
+                                📋 Copiar
+                              </button>
+                              <button
+                                onClick={compartirDatosViaApp}
+                                className="flex-1 bg-purple-600 text-white py-1 px-3 rounded text-xs hover:bg-purple-700"
+                              >
+                                📱 WhatsApp
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="border-t pt-3">
+                          <input
+                            type="text"
+                            placeholder="Pega el código aquí..."
+                            value={codigoSincronizacion}
+                            onChange={(e) => setCodigoSincronizacion(e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded text-sm mb-2"
+                          />
+                          <button
+                            onClick={() => {
+                              if (aplicarCodigoSincronizacion(codigoSincronizacion.trim())) {
+                                alert('Datos sincronizados correctamente. La página se recargará.');
+                                window.location.reload();
+                              } else {
+                                alert('Código inválido. Verifica que esté copiado correctamente.');
+                              }
+                            }}
+                            className="w-full bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700 transition-colors text-sm font-medium"
+                          >
+                            ✅ Aplicar Código
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Backup y Restauración */}
                 <div className="bg-white p-6 rounded-lg border border-gray-200">
-                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Backup y Restauración</h3>
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4">💾 Backup y Restauración</h3>
                   <div className="space-y-4">
                     <div>
                       <button
